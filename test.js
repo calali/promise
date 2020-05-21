@@ -1,60 +1,127 @@
-function getUserId() {
-    return new Promise1(function(resolve) {
-        resolve('ok')
-    })
-}
-getUserId().then(function(data) {
+
+
+function Promise1(executor) {
+    // console.log(0)
+    var self = this
+    self.status = 'pending' // Promise当前的状态
+    self.data = undefined  // Promise的值
+    self.onResolvedCallback = [] // Promise1 resolve时的回调函数集，因为在Promise结束之前有可能有多个回调添加到它上面
+    self.onRejectedCallback = [] // Promise1 reject时的回调函数集，因为在Promise结束之前有可能有多个回调添加到它上面
+    // ...
+    this.then = function(onResolved, onRejected) {
+        var self = this
+        var promise2
+      
+        // 根据标准，如果then的参数不是function，则我们需要忽略它，此处以如下方式处理
+        onResolved = typeof onResolved === 'function' ? onResolved : function(value) {}
+        onRejected = typeof onRejected === 'function' ? onRejected : function(reason) {}
+      
+        if (self.status === 'resolved') {
+          // 如果promise1(此处即为this/self)的状态已经确定并且是resolved，我们调用onResolved
+          // 因为考虑到有可能throw，所以我们将其包在try/catch块里
+          return promise2 = new Promise1(function(resolve, reject) {
+            try {
+              var x = onResolved(self.data)
+              if (x instanceof Promise1) { // 如果onResolved的返回值是一个Promise对象，直接取它的结果做为promise2的结果
+                // console.log(x,resolve,reject)
+                x.then(resolve, reject)
+              }else{
+                resolve(x) // 否则，以它的返回值做为promise2的结果
+              }
+                // resolve(x) // 否则，以它的返回值做为promise2的结果
+            } catch (e) {
+              reject(e) // 如果出错，以捕获到的错误做为promise2的结果
+            }
+          })
+        }
+      
+        // 此处与前一个if块的逻辑几乎相同，区别在于所调用的是onRejected函数，就不再做过多解释
+        if (self.status === 'rejected') {
+          return promise2 = new Promise1(function(resolve, reject) {
+            try {
+              var x = onRejected(self.data)
+              if (x instanceof Promise1) {
+                x.then(resolve, reject)
+              }
+            } catch (e) {
+              reject(e)
+            }
+          })
+        }
+      
+        if (self.status === 'pending') {
+        // 如果当前的Promise还处于pending状态，我们并不能确定调用onResolved还是onRejected，
+        // 只能等到Promise的状态确定后，才能确实如何处理。
+        // 所以我们需要把我们的**两种情况**的处理逻辑做为callback放入promise1(此处即this/self)的回调数组里
+        // 逻辑本身跟第一个if块内的几乎一致，此处不做过多解释
+          return promise2 = new Promise1(function(resolve, reject) {
+            self.onResolvedCallback.push(function(value) {
+              try {
+                var x = onResolved(self.data)
+                if (x instanceof Promise1) {
+                  x.then(resolve, reject)
+                }
+              } catch (e) {
+                reject(e)
+              }
+            })
+      
+            self.onRejectedCallback.push(function(reason) {
+              try {
+                var x = onRejected(self.data)
+                if (x instanceof Promise1) {
+                  x.then(resolve, reject)
+                }
+              } catch (e) {
+                reject(e)
+              }
+            })
+          })
+        }
+    }
+  
+    function resolve(value) {
+      if (self.status === 'pending') {
+        self.status = 'resolved'
+        self.data = value
+        for(var i = 0; i < self.onResolvedCallback.length; i++) {
+          self.onResolvedCallback[i](value)
+        }
+      }
+    }
+  
+    function reject(reason) {
+      if (self.status === 'pending') {
+        self.status = 'rejected'
+        self.data = reason
+        for(var i = 0; i < self.onRejectedCallback.length; i++) {
+          self.onRejectedCallback[i](reason)
+        }
+      }
+    }
+  
+    // ...
+    try {
+        executor(resolve.bind(this), reject.bind(this))
+    } catch(e) {
+        reject.bind(this)(e)
+    }
+  }
+
+  
+
+
+
+new Promise1(function(resolve) {
+    resolve('ok')
+}).then(function(data) {
     //一些处理
     console.log(1,data);
-    // resolve('ha')
-    // return new Promise1(function(resolve){
-    //     resolve('ha')
-    // })
-    return 'ha'
+    // return 'ha'
+    return new Promise1(function(resolve){
+        resolve('ha')
+    })
 })
-.then(function(data){
+.then(function (data){
     console.log(2,data)
 })
-function Promise1(fn) {
-    var state = 'pending',
-        value = null,
-        callbacks = [];
-    this.then = function (onFulfilled) {
-        return new Promise1(function (resolve) {
-            handle({
-                onFulfilled: onFulfilled || null,
-                resolve: resolve
-            });
-        });
-    };
-    function handle(callback) {
-        if (state === 'pending') {
-            callbacks.push(callback);
-            return;
-        }
-        //如果then中没有传递任何东西
-        if(!callback.onFulfilled) {
-            callback.resolve(value);
-            return;
-        }
-        var ret = callback.onFulfilled(value);
-        callback.resolve(ret);
-    }
-    function resolve(newValue) {
-        if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
-            var then = newValue.then;
-            if (typeof then === 'function') {
-                then.call(newValue, resolve);
-                return;
-            }
-        }
-        state = 'fulfilled';
-        value = newValue;
-        setTimeout(function () {
-            callbacks.forEach(function (callback) {
-                handle(callback);
-            });
-        }, 0);
-    }
-    fn(resolve);
-}
