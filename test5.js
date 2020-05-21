@@ -107,8 +107,8 @@ function resolvePromise(promise,x,resolve,reject){
 
 const promise1 = new Promise(function(resolve,reject){
     setTimeout(function(){
-        // resolve(123)
-        reject(123)
+        resolve(123)
+        // reject(123)
     },0)
 })
 
